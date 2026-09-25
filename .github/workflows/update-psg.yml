@@ -2,11 +2,9 @@ name: Update PSG Widget
 
 on:
  schedule:
- # ~Midi heure de Paris (10h UTC en été, 11h UTC en hiver)
  - cron: '0 10 * * *'
- # ~Minuit heure de Paris (22h UTC en été, 23h UTC en hiver)
  - cron: '0 22 * * *'
- workflow_dispatch: # Déclenchement manuel
+ workflow_dispatch:
 
 permissions:
  contents: write
@@ -24,19 +22,15 @@ jobs:
  set -e
  export TZ="Europe/Paris"
 
- # --- Récupération des matchs Ligue 1 ---
  FINISHED=$(curl -sf -H "X-Auth-Token: $API_KEY" \
  "https://api.football-data.org/v4/competitions/FL1/matches?status=FINISHED&limit=15" || echo '{"matches":[]}')
 
  SCHEDULED=$(curl -sf -H "X-Auth-Token: $API_KEY" \
  "https://api.football-data.org/v4/competitions/FL1/matches?status=SCHEDULED&limit=15" || echo '{"matches":[]}')
 
- # --- Dernier match du PSG ---
  LAST_MATCH=$(echo "$FINISHED" | jq '[.matches[] | select(.homeTeam.id == 524 or .awayTeam.id == 524)] | last')
-
  MATCH_ID=$(echo "$LAST_MATCH" | jq -r '.id // empty')
 
- # Buteurs (détail du match)
  GOALS_JSON="[]"
  if [ -n "$MATCH_ID" ]; then
  sleep 1
@@ -45,10 +39,8 @@ jobs:
  GOALS_JSON=$(echo "$DETAIL" | jq '[.goals[]? | {name: .scorer.name, minute: .minute, team_id: .team.id}]' 2>/dev/null || echo "[]")
  fi
 
- # --- Prochain match du PSG ---
  NEXT_MATCH=$(echo "$SCHEDULED" | jq '[.matches[] | select(.homeTeam.id == 524 or .awayTeam.id == 524)] | first')
 
- # --- Extraction des variables ---
  LAST_DATE=$(echo "$LAST_MATCH" | jq -r '.utcDate // empty')
  LAST_HOME_NAME=$(echo "$LAST_MATCH" | jq -r '.homeTeam.shortName // .homeTeam.name // "?"')
  LAST_AWAY_NAME=$(echo "$LAST_MATCH" | jq -r '.awayTeam.shortName // .awayTeam.name // "?"')
@@ -65,7 +57,6 @@ jobs:
  NEXT_HOME_CREST=$(echo "$NEXT_MATCH" | jq -r '.homeTeam.crest // ""')
  NEXT_AWAY_CREST=$(echo "$NEXT_MATCH" | jq -r '.awayTeam.crest // ""')
 
- # --- Formatage des dates en français ---
  LAST_DATE_FR=""
  if [ -n "$LAST_DATE" ]; then
  LAST_DATE_FR=$(date -d "$LAST_DATE" "+%a %d %b %Y" \
@@ -84,14 +75,12 @@ jobs:
  NEXT_TIME_FR=$(date -d "$NEXT_DATE" "+%Hh%M")
  fi
 
- # --- Buteurs HTML ---
  HOME_GOALS_HTML=$(echo "$GOALS_JSON" | jq -r --arg tid "$LAST_HOME_ID" \
  '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)'"] | join("<br>") end')
 
  AWAY_GOALS_HTML=$(echo "$GOALS_JSON" | jq -r --arg tid "$LAST_AWAY_ID" \
  '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)'"] | join("<br>") end')
 
- # --- Génération du HTML statique ---
  cat > index.html << 'HEADER'
  <!DOCTYPE html>
  <html lang="fr">
@@ -119,7 +108,6 @@ jobs:
  <body>
  HEADER
 
- # Bloc dernier match
  if [ -n "$LAST_DATE" ] && [ "$LAST_HOME_NAME" != "?" ]; then
  cat >> index.html << EOF
  <div class="mb">
@@ -152,7 +140,6 @@ jobs:
 
  echo '<hr class="sep">' >> index.html
 
- # Bloc prochain match
  if [ -n "$NEXT_DATE" ] && [ "$NEXT_HOME_NAME" != "?" ]; then
  cat >> index.html << EOF
  <div class="mb">
