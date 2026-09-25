@@ -4,39 +4,22 @@ export TZ="Europe/Paris"
 
 ESPN="https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1"
 PSG_ID="160"
+PSG_FDA_ID="524"
 
-# --- Collecte des matchs PSG depuis plusieurs sources ---
+# =============================================
+# DERNIER MATCH (via ESPN - buteurs + logos)
+# =============================================
 SCHEDULE=$(curl -sf "$ESPN/teams/$PSG_ID/schedule" || echo '{"events":[]}')
 SCOREBOARD=$(curl -sf "$ESPN/scoreboard" || echo '{"events":[]}')
 
-# Scoreboards des prochaines semaines (dates individuelles)
-sleep 1
-F1=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+1 days' +%Y%m%d)" || echo '{"events":[]}')
-F2=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+7 days' +%Y%m%d)" || echo '{"events":[]}')
-F3=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+14 days' +%Y%m%d)" || echo '{"events":[]}')
-F4=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+21 days' +%Y%m%d)" || echo '{"events":[]}')
-F5=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+28 days' +%Y%m%d)" || echo '{"events":[]}')
-
-# Calendrier equipe saison en cours
-sleep 1
-TEAM_SCHED=$(curl -sf "$ESPN/teams/$PSG_ID/schedule?season=$(date +%Y)" || echo '{"events":[]}')
-
-# Fusionner, filtrer PSG, dedupliquer
 ALL_PSG=$(jq -n --arg pid "$PSG_ID" \
   --argjson s "$SCHEDULE" \
   --argjson sb "$SCOREBOARD" \
-  --argjson f1 "$F1" \
-  --argjson f2 "$F2" \
-  --argjson f3 "$F3" \
-  --argjson f4 "$F4" \
-  --argjson f5 "$F5" \
-  --argjson ts "$TEAM_SCHED" \
-  '[$s.events[]?, $sb.events[]?, $f1.events[]?, $f2.events[]?, $f3.events[]?, $f4.events[]?, $f5.events[]?, $ts.events[]?]
+  '[$s.events[]?, $sb.events[]?]
    | [.[] | select(.competitions[0].competitors[]?.team.id == $pid)]
    | group_by(.id) | [.[] | .[0]]
    | sort_by(.date)')
 
-# --- Dernier match termine ---
 LAST_EVENT=$(echo "$ALL_PSG" | jq '[.[] | select(.status.type.completed == true or .competitions[0].status.type.completed == true)] | last')
 LAST_EVENT_ID=$(echo "$LAST_EVENT" | jq -r '.id // empty')
 LAST_DATE=$(echo "$LAST_EVENT" | jq -r '.date // empty')
@@ -53,7 +36,7 @@ LAST_AWAY_SCORE=$(echo "$LAST_AWAY" | jq -r '.score.displayValue // (.score.valu
 LAST_HOME_ID=$(echo "$LAST_HOME" | jq -r '.team.id // ""')
 LAST_AWAY_ID=$(echo "$LAST_AWAY" | jq -r '.team.id // ""')
 
-# --- Buteurs ---
+# Buteurs
 HOME_GOALS_HTML=""
 AWAY_GOALS_HTML=""
 if [ -n "$LAST_EVENT_ID" ]; then
@@ -67,17 +50,20 @@ if [ -n "$LAST_EVENT_ID" ]; then
     '[.keyEvents[]? | select(.scoringPlay == true and .team.id == $aid) | "\(.participants[0].athlete.displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
 fi
 
-# --- Prochain match ---
-NEXT_EVENT=$(echo "$ALL_PSG" | jq '[.[] | select(.status.type.completed != true and .competitions[0].status.type.completed != true)] | first')
-NEXT_DATE=$(echo "$NEXT_EVENT" | jq -r '.date // empty')
+# =============================================
+# PROCHAIN MATCH (via football-data.org)
+# =============================================
+sleep 1
+NEXT_FDA=$(curl -sf -H "X-Auth-Token: $API_KEY" \
+  "https://api.football-data.org/v4/competitions/FL1/matches?status=SCHEDULED&limit=15" || echo '{"matches":[]}')
 
-NEXT_HOME=$(echo "$NEXT_EVENT" | jq '.competitions[0].competitors[]? | select(.homeAway == "home")' 2>/dev/null || echo '{}')
-NEXT_AWAY=$(echo "$NEXT_EVENT" | jq '.competitions[0].competitors[]? | select(.homeAway == "away")' 2>/dev/null || echo '{}')
+NEXT_MATCH=$(echo "$NEXT_FDA" | jq '[.matches[]? | select(.homeTeam.id == 524 or .awayTeam.id == 524)] | first')
 
-NEXT_HOME_NAME=$(echo "$NEXT_HOME" | jq -r '.team.shortDisplayName // .team.displayName // "?"' 2>/dev/null || echo "?")
-NEXT_AWAY_NAME=$(echo "$NEXT_AWAY" | jq -r '.team.shortDisplayName // .team.displayName // "?"' 2>/dev/null || echo "?")
-NEXT_HOME_LOGO=$(echo "$NEXT_HOME" | jq -r '.team.logos[0].href // ""' 2>/dev/null || echo "")
-NEXT_AWAY_LOGO=$(echo "$NEXT_AWAY" | jq -r '.team.logos[0].href // ""' 2>/dev/null || echo "")
+NEXT_DATE=$(echo "$NEXT_MATCH" | jq -r '.utcDate // empty')
+NEXT_HOME_NAME=$(echo "$NEXT_MATCH" | jq -r '.homeTeam.shortName // .homeTeam.name // "?"')
+NEXT_AWAY_NAME=$(echo "$NEXT_MATCH" | jq -r '.awayTeam.shortName // .awayTeam.name // "?"')
+NEXT_HOME_CREST=$(echo "$NEXT_MATCH" | jq -r '.homeTeam.crest // ""')
+NEXT_AWAY_CREST=$(echo "$NEXT_MATCH" | jq -r '.awayTeam.crest // ""')
 
 # --- Formatage dates ---
 LAST_DATE_FR=""
@@ -100,12 +86,8 @@ fi
 
 # --- Debug ---
 echo "DEBUG LAST: $LAST_HOME_NAME $LAST_HOME_SCORE - $LAST_AWAY_SCORE $LAST_AWAY_NAME" >&2
-echo "DEBUG HOME_GOALS: $HOME_GOALS_HTML" >&2
-echo "DEBUG AWAY_GOALS: $AWAY_GOALS_HTML" >&2
-echo "DEBUG LOGOS: H=$LAST_HOME_LOGO A=$LAST_AWAY_LOGO" >&2
+echo "DEBUG GOALS: H=$HOME_GOALS_HTML | A=$AWAY_GOALS_HTML" >&2
 echo "DEBUG NEXT: $NEXT_HOME_NAME vs $NEXT_AWAY_NAME | $NEXT_DATE_FR $NEXT_TIME_FR" >&2
-echo "DEBUG FUTURE_COUNT: F1=$(echo "$F1" | jq '[.events[]?] | length') F2=$(echo "$F2" | jq '[.events[]?] | length') TS=$(echo "$TEAM_SCHED" | jq '[.events[]?] | length')" >&2
-echo "DEBUG ALL_PSG_NEXT: $(echo "$ALL_PSG" | jq '[.[] | select(.status.type.completed != true and .competitions[0].status.type.completed != true)] | [.[]? | {id, date, name}]')" >&2
 
 # --- Generation HTML ---
 cat > index.html << 'HTMLEOF'
@@ -173,12 +155,12 @@ if [ -n "$NEXT_DATE" ] && [ "$NEXT_HOME_NAME" != "?" ]; then
   <div class="dt">${NEXT_DATE_FR}</div>
   <div class="mr">
     <div class="tm">
-      <img src="${NEXT_HOME_LOGO}" alt="${NEXT_HOME_NAME}" onerror="this.style.display='none'">
+      <img src="${NEXT_HOME_CREST}" alt="${NEXT_HOME_NAME}" onerror="this.style.display='none'">
       <span class="tn">${NEXT_HOME_NAME}</span>
     </div>
     <div class="ti">${NEXT_TIME_FR}</div>
     <div class="tm">
-      <img src="${NEXT_AWAY_LOGO}" alt="${NEXT_AWAY_NAME}" onerror="this.style.display='none'">
+      <img src="${NEXT_AWAY_CREST}" alt="${NEXT_AWAY_NAME}" onerror="this.style.display='none'">
       <span class="tn">${NEXT_AWAY_NAME}</span>
     </div>
   </div>
