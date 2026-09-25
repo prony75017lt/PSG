@@ -5,22 +5,33 @@ export TZ="Europe/Paris"
 ESPN="https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1"
 PSG_ID="160"
 
-# --- Collecte des matchs PSG ---
+# --- Collecte des matchs PSG depuis plusieurs sources ---
 SCHEDULE=$(curl -sf "$ESPN/teams/$PSG_ID/schedule" || echo '{"events":[]}')
 SCOREBOARD=$(curl -sf "$ESPN/scoreboard" || echo '{"events":[]}')
 
-# Scoreboard du mois a venir (format range)
-TODAY=$(date +%Y%m%d)
-IN30=$(date -d '+30 days' +%Y%m%d)
+# Scoreboards des prochaines semaines (dates individuelles)
 sleep 1
-FUTURE=$(curl -sf "$ESPN/scoreboard?dates=${TODAY}-${IN30}" || echo '{"events":[]}')
+F1=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+1 days' +%Y%m%d)" || echo '{"events":[]}')
+F2=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+7 days' +%Y%m%d)" || echo '{"events":[]}')
+F3=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+14 days' +%Y%m%d)" || echo '{"events":[]}')
+F4=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+21 days' +%Y%m%d)" || echo '{"events":[]}')
+F5=$(curl -sf "$ESPN/scoreboard?dates=$(date -d '+28 days' +%Y%m%d)" || echo '{"events":[]}')
+
+# Calendrier equipe saison en cours
+sleep 1
+TEAM_SCHED=$(curl -sf "$ESPN/teams/$PSG_ID/schedule?season=$(date +%Y)" || echo '{"events":[]}')
 
 # Fusionner, filtrer PSG, dedupliquer
 ALL_PSG=$(jq -n --arg pid "$PSG_ID" \
   --argjson s "$SCHEDULE" \
   --argjson sb "$SCOREBOARD" \
-  --argjson f "$FUTURE" \
-  '[$s.events[]?, $sb.events[]?, $f.events[]?]
+  --argjson f1 "$F1" \
+  --argjson f2 "$F2" \
+  --argjson f3 "$F3" \
+  --argjson f4 "$F4" \
+  --argjson f5 "$F5" \
+  --argjson ts "$TEAM_SCHED" \
+  '[$s.events[]?, $sb.events[]?, $f1.events[]?, $f2.events[]?, $f3.events[]?, $f4.events[]?, $f5.events[]?, $ts.events[]?]
    | [.[] | select(.competitions[0].competitors[]?.team.id == $pid)]
    | group_by(.id) | [.[] | .[0]]
    | sort_by(.date)')
@@ -42,7 +53,7 @@ LAST_AWAY_SCORE=$(echo "$LAST_AWAY" | jq -r '.score.displayValue // (.score.valu
 LAST_HOME_ID=$(echo "$LAST_HOME" | jq -r '.team.id // ""')
 LAST_AWAY_ID=$(echo "$LAST_AWAY" | jq -r '.team.id // ""')
 
-# --- Buteurs (tous les scoring plays) ---
+# --- Buteurs ---
 HOME_GOALS_HTML=""
 AWAY_GOALS_HTML=""
 if [ -n "$LAST_EVENT_ID" ]; then
@@ -93,7 +104,8 @@ echo "DEBUG HOME_GOALS: $HOME_GOALS_HTML" >&2
 echo "DEBUG AWAY_GOALS: $AWAY_GOALS_HTML" >&2
 echo "DEBUG LOGOS: H=$LAST_HOME_LOGO A=$LAST_AWAY_LOGO" >&2
 echo "DEBUG NEXT: $NEXT_HOME_NAME vs $NEXT_AWAY_NAME | $NEXT_DATE_FR $NEXT_TIME_FR" >&2
-echo "DEBUG FUTURE_COUNT: $(echo "$FUTURE" | jq '[.events[]?] | length')" >&2
+echo "DEBUG FUTURE_COUNT: F1=$(echo "$F1" | jq '[.events[]?] | length') F2=$(echo "$F2" | jq '[.events[]?] | length') TS=$(echo "$TEAM_SCHED" | jq '[.events[]?] | length')" >&2
+echo "DEBUG ALL_PSG_NEXT: $(echo "$ALL_PSG" | jq '[.[] | select(.status.type.completed != true and .competitions[0].status.type.completed != true)] | [.[]? | {id, date, name}]')" >&2
 
 # --- Generation HTML ---
 cat > index.html << 'HTMLEOF'
