@@ -75,11 +75,11 @@ jobs:
             NEXT_TIME_FR=$(date -d "$NEXT_DATE" "+%Hh%M")
           fi
 
-          HOME_GOALS_HTML=$(echo "$GOALS_JSON" | jq -r --arg tid "$LAST_HOME_ID" \
-            '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)'"] | join("<br>") end')
+ HOME_GOALS_HTML=$(echo "$GOALS_JSON" | jq -r --arg tid "$LAST_HOME_ID" \
+            '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)&#39;"] | join("<br>") end')
 
           AWAY_GOALS_HTML=$(echo "$GOALS_JSON" | jq -r --arg tid "$LAST_AWAY_ID" \
-            '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)'"] | join("<br>") end')
+            '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)&#39;"] | join("<br>") end')
 
           cat > index.html << 'HEADER'
           <!DOCTYPE html>
