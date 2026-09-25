@@ -16,8 +16,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Generate widget
-        env:
-          API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
         run: bash update.sh
 
       - name: Commit and push
