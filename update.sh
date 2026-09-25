@@ -98,20 +98,20 @@ cat > index.html << 'HTMLEOF'
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;color:#e0e0e0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:8px}
-.mb{width:100%;max-width:340px;margin-bottom:10px}
-.dt{text-align:center;font-size:11px;color:#999;text-transform:capitalize;margin-bottom:4px;letter-spacing:.5px}
-.mr{display:flex;align-items:center;justify-content:center;gap:10px}
-.tm{display:flex;flex-direction:column;align-items:center;width:90px}
-.tm img{width:36px;height:36px;object-fit:contain;margin-bottom:3px}
-.tn{font-size:11px;color:#ccc;text-align:center;line-height:1.2}
-.sc{font-size:28px;font-weight:700;color:#fff;letter-spacing:2px;min-width:60px;text-align:center}
-.ti{font-size:18px;font-weight:600;color:#aaa;min-width:60px;text-align:center}
-.gr{display:flex;justify-content:center;gap:10px;margin-top:4px}
-.gs{width:90px;font-size:9px;color:#888;text-align:center;line-height:1.4}
-.gx{min-width:60px}
-hr.sep{width:60px;border:none;border-top:1px solid #333;margin:6px auto}
-.nd{text-align:center;font-size:11px;color:#666}
+body{background:#000;color:#e0e0e0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:5px}
+.mb{width:100%;max-width:240px;margin-bottom:6px}
+.dt{text-align:center;font-size:8px;color:#999;text-transform:capitalize;margin-bottom:3px;letter-spacing:.4px}
+.mr{display:flex;align-items:center;justify-content:center;gap:6px}
+.tm{display:flex;flex-direction:column;align-items:center;width:62px}
+.tm img{width:24px;height:24px;object-fit:contain;margin-bottom:2px}
+.tn{font-size:8px;color:#ccc;text-align:center;line-height:1.2}
+.sc{font-size:20px;font-weight:700;color:#fff;letter-spacing:1px;min-width:42px;text-align:center}
+.ti{font-size:13px;font-weight:600;color:#aaa;min-width:42px;text-align:center}
+.gr{display:flex;justify-content:center;gap:6px;margin-top:3px}
+.gs{width:62px;font-size:7px;color:#888;text-align:center;line-height:1.3}
+.gx{min-width:42px}
+hr.sep{width:42px;border:none;border-top:1px solid #333;margin:4px auto}
+.nd{text-align:center;font-size:8px;color:#666}
 </style>
 </head>
 <body>
