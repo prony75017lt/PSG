@@ -3,7 +3,7 @@ set -e
 export TZ="Europe/Paris"
 
 ESPN="https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1"
-PSG_ID=160
+PSG_ID="160"
 
 # --- Calendrier PSG ---
 SCHEDULE=$(curl -sf "$ESPN/teams/$PSG_ID/schedule" || echo '{}')
@@ -13,12 +13,12 @@ LAST_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status
 LAST_EVENT_ID=$(echo "$LAST_EVENT" | jq -r '.id // empty')
 
 # Prochain match a venir
-NEXT_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status.type.completed == false and .competitions[0].status.type.description != "In Progress")] | first')
+NEXT_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status.type.completed == false)] | first')
 
 # --- Donnees du dernier match ---
 LAST_DATE=$(echo "$LAST_EVENT" | jq -r '.date // empty')
-LAST_HOME=$(echo "$LAST_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "home")')
-LAST_AWAY=$(echo "$LAST_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "away")')
+LAST_HOME=$(echo "$LAST_EVENT" | jq -r '.competitions[0].competitors[] | select(.homeAway == "home")' 2>/dev/null || echo '{}')
+LAST_AWAY=$(echo "$LAST_EVENT" | jq -r '.competitions[0].competitors[] | select(.homeAway == "away")' 2>/dev/null || echo '{}')
 
 LAST_HOME_NAME=$(echo "$LAST_HOME" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
 LAST_AWAY_NAME=$(echo "$LAST_AWAY" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
@@ -26,8 +26,8 @@ LAST_HOME_LOGO=$(echo "$LAST_HOME" | jq -r '.team.logo // ""')
 LAST_AWAY_LOGO=$(echo "$LAST_AWAY" | jq -r '.team.logo // ""')
 LAST_HOME_SCORE=$(echo "$LAST_HOME" | jq -r '.score // "?"')
 LAST_AWAY_SCORE=$(echo "$LAST_AWAY" | jq -r '.score // "?"')
-LAST_HOME_ID=$(echo "$LAST_HOME" | jq -r '.team.id')
-LAST_AWAY_ID=$(echo "$LAST_AWAY" | jq -r '.team.id')
+LAST_HOME_ID=$(echo "$LAST_HOME" | jq -r '.team.id // ""')
+LAST_AWAY_ID=$(echo "$LAST_AWAY" | jq -r '.team.id // ""')
 
 # --- Buteurs (detail du match) ---
 HOME_GOALS_HTML=""
@@ -36,24 +36,22 @@ if [ -n "$LAST_EVENT_ID" ]; then
   sleep 1
   SUMMARY=$(curl -sf "$ESPN/summary?event=$LAST_EVENT_ID" || echo '{}')
 
- echo "DEBUG FULL_GOAL: $(echo "$SUMMARY" | jq '[.keyEvents[] | select(.type.text == "Goal")] | .[0]')" >&2
-
   HOME_GOALS_HTML=$(echo "$SUMMARY" | jq -r --arg hid "$LAST_HOME_ID" \
-    '[.keyEvents[]? // .competitions[0].details[]? | select(.type.text == "Goal" or .type.text == "Goal - Header" or .type.text == "Penalty - Scored") | select(.team.id == $hid) | "\(.athletesInvolved[0].displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
+    '[.keyEvents[]? | select(.type.text == "Goal" and .team.id == $hid) | "\(.participants[0].athlete.displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
 
   AWAY_GOALS_HTML=$(echo "$SUMMARY" | jq -r --arg aid "$LAST_AWAY_ID" \
-    '[.keyEvents[]? // .competitions[0].details[]? | select(.type.text == "Goal" or .type.text == "Goal - Header" or .type.text == "Penalty - Scored") | select(.team.id == $aid) | "\(.athletesInvolved[0].displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
+    '[.keyEvents[]? | select(.type.text == "Goal" and .team.id == $aid) | "\(.participants[0].athlete.displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
 fi
 
 # --- Donnees du prochain match ---
 NEXT_DATE=$(echo "$NEXT_EVENT" | jq -r '.date // empty')
-NEXT_HOME=$(echo "$NEXT_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "home")')
-NEXT_AWAY=$(echo "$NEXT_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "away")')
+NEXT_HOME=$(echo "$NEXT_EVENT" | jq -r '.competitions[0].competitors[]? | select(.homeAway == "home")' 2>/dev/null || echo '{}')
+NEXT_AWAY=$(echo "$NEXT_EVENT" | jq -r '.competitions[0].competitors[]? | select(.homeAway == "away")' 2>/dev/null || echo '{}')
 
-NEXT_HOME_NAME=$(echo "$NEXT_HOME" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
-NEXT_AWAY_NAME=$(echo "$NEXT_AWAY" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
-NEXT_HOME_LOGO=$(echo "$NEXT_HOME" | jq -r '.team.logo // ""')
-NEXT_AWAY_LOGO=$(echo "$NEXT_AWAY" | jq -r '.team.logo // ""')
+NEXT_HOME_NAME=$(echo "$NEXT_HOME" | jq -r '.team.shortDisplayName // .team.displayName // "?"' 2>/dev/null || echo "?")
+NEXT_AWAY_NAME=$(echo "$NEXT_AWAY" | jq -r '.team.shortDisplayName // .team.displayName // "?"' 2>/dev/null || echo "?")
+NEXT_HOME_LOGO=$(echo "$NEXT_HOME" | jq -r '.team.logo // ""' 2>/dev/null || echo "")
+NEXT_AWAY_LOGO=$(echo "$NEXT_AWAY" | jq -r '.team.logo // ""' 2>/dev/null || echo "")
 
 # --- Formatage des dates en francais ---
 LAST_DATE_FR=""
