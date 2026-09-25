@@ -17,7 +17,9 @@ if [ -n "$MATCH_ID" ]; then
   DETAIL=$(curl -sf -H "X-Auth-Token: $API_KEY" \
     "https://api.football-data.org/v4/matches/$MATCH_ID" || echo '{}')
   GOALS_JSON=$(echo "$DETAIL" | jq '[.goals[]? | {name: .scorer.name, minute: .minute, team_id: .team.id}]' 2>/dev/null || echo "[]")
-fi
+  echo "DEBUG DETAIL: $DETAIL" >&2
+  echo "DEBUG GOALS: $GOALS_JSON" >&2
+  fi
 
 NEXT_MATCH=$(echo "$SCHEDULED" | jq '[.matches[] | select(.homeTeam.id == 524 or .awayTeam.id == 524)] | first')
 
@@ -70,7 +72,7 @@ cat > index.html << 'HTMLEOF'
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:transparent;color:#e0e0e0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:8px}
+body{background:#000;color:#e0e0e0;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:8px}
 .mb{width:100%;max-width:340px;margin-bottom:10px}
 .dt{text-align:center;font-size:11px;color:#999;text-transform:capitalize;margin-bottom:4px;letter-spacing:.5px}
 .mr{display:flex;align-items:center;justify-content:center;gap:10px}
