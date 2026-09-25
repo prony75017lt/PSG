@@ -12,8 +12,26 @@ SCHEDULE=$(curl -sf "$ESPN/teams/$PSG_ID/schedule" || echo '{}')
 LAST_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status.type.completed == true)] | last')
 LAST_EVENT_ID=$(echo "$LAST_EVENT" | jq -r '.id // empty')
 
-# Prochain match a venir
-NEXT_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status.type.completed == false)] | first')
+# Prochain match : chercher dans le calendrier ou via le scoreboard
+NEXT_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status.type.completed == false and .competitions[0].status.type.name != "STATUS_IN_PROGRESS")] | first')
+
+# Si rien dans le calendrier, essayer le scoreboard
+if [ "$(echo "$NEXT_EVENT" | jq -r '.id // empty')" = "" ]; then
+  sleep 1
+  SCOREBOARD=$(curl -sf "$ESPN/scoreboard" || echo '{}')
+  NEXT_EVENT=$(echo "$SCOREBOARD" | jq --arg pid "$PSG_ID" '[.events[]? | select(.competitions[0].competitors[]?.team.id == $pid) | select(.competitions[0].status.type.completed == false)] | first')
+fi
+
+# Si toujours rien, chercher les prochaines semaines
+if [ "$(echo "$NEXT_EVENT" | jq -r '.id // empty')" = "" ]; then
+  NEXT_WEEK=$(date -d "+7 days" "+%Y%m%d")
+  sleep 1
+  FUTURE=$(curl -sf "$ESPN/scoreboard?dates=$(date +%Y%m%d)-${NEXT_WEEK}" || echo '{}')
+  NEXT_EVENT=$(echo "$FUTURE" | jq --arg pid "$PSG_ID" '[.events[]? | select(.competitions[0].competitors[]?.team.id == $pid)] | first')
+fi
+
+echo "DEBUG NEXT_EVENT_ID: $(echo "$NEXT_EVENT" | jq -r '.id // empty')" >&2
+echo "DEBUG NEXT_DATE: $(echo "$NEXT_EVENT" | jq -r '.date // empty')" >&2
 
 # --- Donnees du dernier match ---
 LAST_DATE=$(echo "$LAST_EVENT" | jq -r '.date // empty')
@@ -24,8 +42,8 @@ LAST_HOME_NAME=$(echo "$LAST_HOME" | jq -r '.team.shortDisplayName // .team.disp
 LAST_AWAY_NAME=$(echo "$LAST_AWAY" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
 LAST_HOME_LOGO=$(echo "$LAST_HOME" | jq -r '.team.logo // ""')
 LAST_AWAY_LOGO=$(echo "$LAST_AWAY" | jq -r '.team.logo // ""')
-LAST_HOME_SCORE=$(echo "$LAST_HOME" | jq -r '.score // "?"')
-LAST_AWAY_SCORE=$(echo "$LAST_AWAY" | jq -r '.score // "?"')
+AST_HOME_SCORE=$(echo "$LAST_HOME" | jq -r '.score.displayValue // .score.value // .score // "?"')
+LAST_AWAY_SCORE=$(echo "$LAST_AWAY" | jq -r '.score.displayValue // .score.value // .score // "?"')
 LAST_HOME_ID=$(echo "$LAST_HOME" | jq -r '.team.id // ""')
 LAST_AWAY_ID=$(echo "$LAST_AWAY" | jq -r '.team.id // ""')
 
