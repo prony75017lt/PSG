@@ -95,8 +95,16 @@ if [ -n "$NEXT_DATE" ]; then
 fi
 
 # --- Debug temporaire ---
-echo "DEBUG LAST: $LAST_EVENT_ID | $LAST_HOME_NAME $LAST_HOME_SCORE - $LAST_AWAY_SCORE $LAST_AWAY_NAME" >&2
-echo "DEBUG NEXT: $(echo "$NEXT_EVENT" | jq -r '.id // empty') | $NEXT_HOME_NAME vs $NEXT_AWAY_NAME | $NEXT_DATE_FR $NEXT_TIME_FR" >&2
+echo "DEBUG LAST_ID: $LAST_EVENT_ID" >&2
+echo "DEBUG SCORES: $LAST_HOME_NAME $LAST_HOME_SCORE - $LAST_AWAY_SCORE $LAST_AWAY_NAME" >&2
+echo "DEBUG HOME_GOALS: $HOME_GOALS_HTML" >&2
+echo "DEBUG AWAY_GOALS: $AWAY_GOALS_HTML" >&2
+echo "DEBUG HOME_LOGO: $LAST_HOME_LOGO" >&2
+echo "DEBUG AWAY_LOGO: $LAST_AWAY_LOGO" >&2
+echo "DEBUG NEXT_RAW: $(echo "$NEXT_EVENT" | jq '{id, date, name}')" >&2
+echo "DEBUG ALL_PSG_COUNT: $(echo "$ALL_PSG" | jq 'length')" >&2
+echo "DEBUG ALL_PSG_SUMMARY: $(echo "$ALL_PSG" | jq '[.[] | {id, date, name, completed: (.status.type.completed // .competitions[0].status.type.completed)}]')" >&2
+echo "DEBUG COMPETITOR_KEYS: $(echo "$LAST_HOME" | jq '.team | keys')" >&2
 
 # --- Generation HTML ---
 cat > index.html << 'HTMLEOF'
