@@ -36,10 +36,7 @@ if [ -n "$LAST_EVENT_ID" ]; then
   sleep 1
   SUMMARY=$(curl -sf "$ESPN/summary?event=$LAST_EVENT_ID" || echo '{}')
 
-echo "DEBUG EVENT_ID: $LAST_EVENT_ID" >&2
-  echo "DEBUG SUMMARY_KEYS: $(echo "$SUMMARY" | jq 'keys')" >&2
-  echo "DEBUG KEYEVENTS: $(echo "$SUMMARY" | jq '[.keyEvents[]? | {type: .type.text, player: .athletesInvolved[0].displayName, time: .clock.displayValue, team: .team.id}] | .[0:5]')" >&2
-  echo "DEBUG DETAILS: $(echo "$SUMMARY" | jq '[.competitions[0].details[]? | {type: .type.text, player: .athletesInvolved[0].displayName, time: .clock.displayValue, team: .team.id}] | .[0:5]')" >&2
+ echo "DEBUG FULL_GOAL: $(echo "$SUMMARY" | jq '[.keyEvents[] | select(.type.text == "Goal")] | .[0]')" >&2
 
   HOME_GOALS_HTML=$(echo "$SUMMARY" | jq -r --arg hid "$LAST_HOME_ID" \
     '[.keyEvents[]? // .competitions[0].details[]? | select(.type.text == "Goal" or .type.text == "Goal - Header" or .type.text == "Penalty - Scored") | select(.team.id == $hid) | "\(.athletesInvolved[0].displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
