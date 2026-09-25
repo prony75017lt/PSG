@@ -2,43 +2,58 @@
 set -e
 export TZ="Europe/Paris"
 
-FINISHED=$(curl -sf -H "X-Auth-Token: $API_KEY" \
-  "https://api.football-data.org/v4/competitions/FL1/matches?status=FINISHED&limit=15" || echo '{"matches":[]}')
+ESPN="https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1"
+PSG_ID=160
 
-SCHEDULED=$(curl -sf -H "X-Auth-Token: $API_KEY" \
-  "https://api.football-data.org/v4/competitions/FL1/matches?status=SCHEDULED&limit=15" || echo '{"matches":[]}')
+# --- Calendrier PSG ---
+SCHEDULE=$(curl -sf "$ESPN/teams/$PSG_ID/schedule" || echo '{}')
 
-LAST_MATCH=$(echo "$FINISHED" | jq '[.matches[] | select(.homeTeam.id == 524 or .awayTeam.id == 524)] | last')
-MATCH_ID=$(echo "$LAST_MATCH" | jq -r '.id // empty')
+# Dernier match termine
+LAST_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status.type.completed == true)] | last')
+LAST_EVENT_ID=$(echo "$LAST_EVENT" | jq -r '.id // empty')
 
-GOALS_JSON="[]"
-if [ -n "$MATCH_ID" ]; then
+# Prochain match a venir
+NEXT_EVENT=$(echo "$SCHEDULE" | jq '[.events[]? | select(.competitions[0].status.type.completed == false and .competitions[0].status.type.description != "In Progress")] | first')
+
+# --- Donnees du dernier match ---
+LAST_DATE=$(echo "$LAST_EVENT" | jq -r '.date // empty')
+LAST_HOME=$(echo "$LAST_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "home")')
+LAST_AWAY=$(echo "$LAST_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "away")')
+
+LAST_HOME_NAME=$(echo "$LAST_HOME" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
+LAST_AWAY_NAME=$(echo "$LAST_AWAY" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
+LAST_HOME_LOGO=$(echo "$LAST_HOME" | jq -r '.team.logo // ""')
+LAST_AWAY_LOGO=$(echo "$LAST_AWAY" | jq -r '.team.logo // ""')
+LAST_HOME_SCORE=$(echo "$LAST_HOME" | jq -r '.score // "?"')
+LAST_AWAY_SCORE=$(echo "$LAST_AWAY" | jq -r '.score // "?"')
+LAST_HOME_ID=$(echo "$LAST_HOME" | jq -r '.team.id')
+LAST_AWAY_ID=$(echo "$LAST_AWAY" | jq -r '.team.id')
+
+# --- Buteurs (detail du match) ---
+HOME_GOALS_HTML=""
+AWAY_GOALS_HTML=""
+if [ -n "$LAST_EVENT_ID" ]; then
   sleep 1
-  DETAIL=$(curl -sf -H "X-Auth-Token: $API_KEY" \
-    "https://api.football-data.org/v4/matches/$MATCH_ID" || echo '{}')
-  GOALS_JSON=$(echo "$DETAIL" | jq '[.goals[]? | {name: .scorer.name, minute: .minute, team_id: .team.id}]' 2>/dev/null || echo "[]")
-  echo "DEBUG DETAIL: $DETAIL" >&2
-  echo "DEBUG GOALS: $GOALS_JSON" >&2
-  fi
+  SUMMARY=$(curl -sf "$ESPN/summary?event=$LAST_EVENT_ID" || echo '{}')
 
-NEXT_MATCH=$(echo "$SCHEDULED" | jq '[.matches[] | select(.homeTeam.id == 524 or .awayTeam.id == 524)] | first')
+  HOME_GOALS_HTML=$(echo "$SUMMARY" | jq -r --arg hid "$LAST_HOME_ID" \
+    '[.keyEvents[]? // .competitions[0].details[]? | select(.type.text == "Goal" or .type.text == "Goal - Header" or .type.text == "Penalty - Scored") | select(.team.id == $hid) | "\(.athletesInvolved[0].displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
 
-LAST_DATE=$(echo "$LAST_MATCH" | jq -r '.utcDate // empty')
-LAST_HOME_NAME=$(echo "$LAST_MATCH" | jq -r '.homeTeam.shortName // .homeTeam.name // "?"')
-LAST_AWAY_NAME=$(echo "$LAST_MATCH" | jq -r '.awayTeam.shortName // .awayTeam.name // "?"')
-LAST_HOME_CREST=$(echo "$LAST_MATCH" | jq -r '.homeTeam.crest // ""')
-LAST_AWAY_CREST=$(echo "$LAST_MATCH" | jq -r '.awayTeam.crest // ""')
-LAST_HOME_SCORE=$(echo "$LAST_MATCH" | jq -r '.score.fullTime.home // "?"')
-LAST_AWAY_SCORE=$(echo "$LAST_MATCH" | jq -r '.score.fullTime.away // "?"')
-LAST_HOME_ID=$(echo "$LAST_MATCH" | jq -r '.homeTeam.id')
-LAST_AWAY_ID=$(echo "$LAST_MATCH" | jq -r '.awayTeam.id')
+  AWAY_GOALS_HTML=$(echo "$SUMMARY" | jq -r --arg aid "$LAST_AWAY_ID" \
+    '[.keyEvents[]? // .competitions[0].details[]? | select(.type.text == "Goal" or .type.text == "Goal - Header" or .type.text == "Penalty - Scored") | select(.team.id == $aid) | "\(.athletesInvolved[0].displayName // "?") \(.clock.displayValue // "")"] | join("<br>")' 2>/dev/null || echo "")
+fi
 
-NEXT_DATE=$(echo "$NEXT_MATCH" | jq -r '.utcDate // empty')
-NEXT_HOME_NAME=$(echo "$NEXT_MATCH" | jq -r '.homeTeam.shortName // .homeTeam.name // "?"')
-NEXT_AWAY_NAME=$(echo "$NEXT_MATCH" | jq -r '.awayTeam.shortName // .awayTeam.name // "?"')
-NEXT_HOME_CREST=$(echo "$NEXT_MATCH" | jq -r '.homeTeam.crest // ""')
-NEXT_AWAY_CREST=$(echo "$NEXT_MATCH" | jq -r '.awayTeam.crest // ""')
+# --- Donnees du prochain match ---
+NEXT_DATE=$(echo "$NEXT_EVENT" | jq -r '.date // empty')
+NEXT_HOME=$(echo "$NEXT_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "home")')
+NEXT_AWAY=$(echo "$NEXT_EVENT" | jq '.competitions[0].competitors[] | select(.homeAway == "away")')
 
+NEXT_HOME_NAME=$(echo "$NEXT_HOME" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
+NEXT_AWAY_NAME=$(echo "$NEXT_AWAY" | jq -r '.team.shortDisplayName // .team.displayName // "?"')
+NEXT_HOME_LOGO=$(echo "$NEXT_HOME" | jq -r '.team.logo // ""')
+NEXT_AWAY_LOGO=$(echo "$NEXT_AWAY" | jq -r '.team.logo // ""')
+
+# --- Formatage des dates en francais ---
 LAST_DATE_FR=""
 if [ -n "$LAST_DATE" ]; then
   LAST_DATE_FR=$(date -d "$LAST_DATE" "+%a %d %b %Y" \
@@ -56,12 +71,6 @@ if [ -n "$NEXT_DATE" ]; then
     | sed 's/Jul/juil./;s/Aug/aout/;s/Sep/sept./;s/Oct/oct./;s/Nov/nov./;s/Dec/dec./')
   NEXT_TIME_FR=$(date -d "$NEXT_DATE" "+%Hh%M")
 fi
-
-HOME_GOALS_HTML=$(echo "$GOALS_JSON" | jq -r --arg tid "$LAST_HOME_ID" \
-  '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)&#39;"] | join("<br>") end')
-
-AWAY_GOALS_HTML=$(echo "$GOALS_JSON" | jq -r --arg tid "$LAST_AWAY_ID" \
-  '[.[] | select(.team_id == ($tid | tonumber))] | if length == 0 then "" else [.[] | "\(.name) \(.minute)&#39;"] | join("<br>") end')
 
 # --- Generation du HTML statique ---
 cat > index.html << 'HTMLEOF'
@@ -97,12 +106,12 @@ if [ -n "$LAST_DATE" ] && [ "$LAST_HOME_NAME" != "?" ]; then
   <div class="dt">${LAST_DATE_FR}</div>
   <div class="mr">
     <div class="tm">
-      <img src="${LAST_HOME_CREST}" alt="${LAST_HOME_NAME}" onerror="this.style.display='none'">
+      <img src="${LAST_HOME_LOGO}" alt="${LAST_HOME_NAME}" onerror="this.style.display='none'">
       <span class="tn">${LAST_HOME_NAME}</span>
     </div>
     <div class="sc">${LAST_HOME_SCORE} - ${LAST_AWAY_SCORE}</div>
     <div class="tm">
-      <img src="${LAST_AWAY_CREST}" alt="${LAST_AWAY_NAME}" onerror="this.style.display='none'">
+      <img src="${LAST_AWAY_LOGO}" alt="${LAST_AWAY_NAME}" onerror="this.style.display='none'">
       <span class="tn">${LAST_AWAY_NAME}</span>
     </div>
   </div>
@@ -129,12 +138,12 @@ if [ -n "$NEXT_DATE" ] && [ "$NEXT_HOME_NAME" != "?" ]; then
   <div class="dt">${NEXT_DATE_FR}</div>
   <div class="mr">
     <div class="tm">
-      <img src="${NEXT_HOME_CREST}" alt="${NEXT_HOME_NAME}" onerror="this.style.display='none'">
+      <img src="${NEXT_HOME_LOGO}" alt="${NEXT_HOME_NAME}" onerror="this.style.display='none'">
       <span class="tn">${NEXT_HOME_NAME}</span>
     </div>
     <div class="ti">${NEXT_TIME_FR}</div>
     <div class="tm">
-      <img src="${NEXT_AWAY_CREST}" alt="${NEXT_AWAY_NAME}" onerror="this.style.display='none'">
+      <img src="${NEXT_AWAY_LOGO}" alt="${NEXT_AWAY_NAME}" onerror="this.style.display='none'">
       <span class="tn">${NEXT_AWAY_NAME}</span>
     </div>
   </div>
